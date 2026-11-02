@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# """LOGIDATA BOGOTÁ — FASES I Y II INTEGRADAS (único archivo).
+# LOGIDATA BOGOTÁ — FASES I Y II INTEGRADAS (único archivo).
 #
 # Dependencias: pip install pandas numpy scipy openpyxl matplotlib
 # Ejemplo: python LogiData_Fases_I_II_integradas.py --output LogiData_consolidado.xlsx
@@ -9,12 +9,11 @@
 # construcciones POR (semilla, cierre). Retiene el TOP 5 estructural exacto,
 # sin duplicados, entre todas las soluciones factibles de TODAS las construcciones.
 # Fase II: 2-opt, Relocate, Swap, fusión y reasignación; mejor mejora por barrido.
-# No construye nuevamente una solución de Fase I, no cambia las bodegas abiertas.
+# Fase II conserva Fase I como punto de partida; puede abrir una bodega si reduce el costo diario.
 # Ambas fases se transfieren en RAM y se exportan en UN libro Excel.
-# """
 from __future__ import annotations
 # ======================== MÓDULO CONSERVADO: config.py ========================
-# """Parámetros de carga y ejecución modificables en este archivo único."""
+# Parámetros de carga y ejecución modificables en este archivo único.
 from dataclasses import dataclass, field
 import math
 
@@ -98,7 +97,7 @@ class SearchConfig:
 
 
 # ======================== MÓDULO CONSERVADO: models.py ========================
-# """Entidades del problema; sin dependencias de las rutinas de búsqueda."""
+# Entidades del problema; sin dependencias de las rutinas de búsqueda.
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -269,7 +268,7 @@ class RunResult:
 
 
 # ======================== MÓDULO CONSERVADO: io_data.py ========================
-# """Lectura segura de Excel, identificadores y matrices dirigidas."""
+# Lectura segura de Excel, identificadores y matrices dirigidas.
 import math
 import pandas as pd
 
@@ -413,7 +412,7 @@ def validate_instance(inst: Instance) -> None:
 
 
 # ======================== MÓDULO CONSERVADO: construction.py ========================
-# """Fase I: combinaciones, regret asignación, CFRS, Cheapest Insertion y matching."""
+# Fase I: combinaciones, regret asignación, CFRS, Cheapest Insertion y matching.
 from itertools import combinations
 import math
 import random
@@ -424,7 +423,8 @@ EPS = 1e-7
 
 
 class ConstructionError(Exception):
-    """Fracaso de la construcción; NO demuestra infactibilidad matemática."""
+    # """Fracaso de la construcción; NO demuestra infactibilidad matemática."""
+    pass
 
 
 def facility_bounds(ins: Instance) -> tuple[int, int]:
@@ -441,7 +441,7 @@ def facility_bounds(ins: Instance) -> tuple[int, int]:
 
 
 def biased_index(n: int, p: float, rng: random.Random) -> int:
-    """Geométrica truncada: peso proporcional a p*(1-p)^r, r=0..n-1."""
+    # """Geométrica truncada: peso proporcional a p*(1-p)^r, r=0..n-1."""
     if n <= 1 or p >= 1:
         return 0
     r = rng.random()
@@ -456,7 +456,7 @@ def biased_index(n: int, p: float, rng: random.Random) -> int:
 
 
 def _unrank(n: int, k: int, rank: int) -> tuple[int, ...]:
-    """Combinación lexicográfica desde su rango, sin crear el espacio completo."""
+    # """Combinación lexicográfica desde su rango, sin crear el espacio completo."""
     positions = []
     first = 0
     for remaining in range(k, 0, -1):
@@ -471,12 +471,13 @@ def _unrank(n: int, k: int, rank: int) -> tuple[int, ...]:
 
 
 def generate_combinations(ins: Instance, s: SearchConfig, rng: random.Random):
-    """Enumera cardinalidades desde la cota necesaria hasta TODAS las bodegas.
+    # """Enumera cardinalidades desde la cota necesaria hasta TODAS las bodegas.
 
-    La capacidad agregada es un filtro necesario, no una prueba de factibilidad.
-    El costo de apertura no se usa todavía para podar: requiere un incumbente
-    completo, factible y VALIDADO obtenido en la búsqueda.
-    """
+#
+    # La capacidad agregada es un filtro necesario, no una prueba de factibilidad.
+    # El costo de apertura no se usa todavía para podar: requiere un incumbente
+    # completo, factible y VALIDADO obtenido en la búsqueda.
+    # """
     lo, hi = facility_bounds(ins)
     ids = sorted(ins.depots)
     total = sum(math.comb(len(ids), k) for k in range(lo, hi + 1))
@@ -502,7 +503,7 @@ def generate_combinations(ins: Instance, s: SearchConfig, rng: random.Random):
 
 
 def proxy_cost(ins: Instance, depot: str, client: str) -> float:
-    """Aproximación por viaje de ida y vuelta por cada tipo de operación."""
+    # """Aproximación por viaje de ida y vuelta por cada tipo de operación."""
     c = ins.clients[client]
     trips = int(c.delivery > EPS) + int(c.pickup > EPS)
     return trips * (ins.d(depot, client) + ins.d(client, depot)) * ins.cost_per_km
@@ -516,7 +517,7 @@ def _can_fit_remaining(ins: Instance, remaining: list[str], residual: dict[str, 
 
 def _repair_assign(ins: Instance, client: str, assignment: dict[str, str], residual: dict[str, float],
                    options: list[str], depth: int, visited: set[str]) -> bool:
-    """Reubicaciones constructivas limitadas, con rollback completo."""
+    # """Reubicaciones constructivas limitadas, con rollback completo."""
     need = ins.clients[client].delivery
     for depot in sorted(options, key=lambda d: proxy_cost(ins, d, client)):
         if residual[depot] + EPS >= need:
@@ -546,12 +547,13 @@ def _repair_assign(ins: Instance, client: str, assignment: dict[str, str], resid
 
 def _assignment_options(ins: Instance, client: str, pending: list[str],
                         residual: dict[str, float]) -> list[tuple[float, str]]:
-    """Costo de atención + oportunidad perdida para las operaciones pendientes.
+    # """Costo de atención + oportunidad perdida para las operaciones pendientes.
 
-    Ambas partes están en COP y se calculan con la misma aproximación vial.
-    Se evita asignar si viola condiciones NECESARIAS de capacidad; no se
-    declara infactibilidad por fallar una prueba de empaquetamiento voraz.
-    """
+#
+    # Ambas partes están en COP y se calculan con la misma aproximación vial.
+    # Se evita asignar si viola condiciones NECESARIAS de capacidad; no se
+    # declara infactibilidad por fallar una prueba de empaquetamiento voraz.
+    # """
     needed = ins.clients[client].delivery
     others = [c for c in pending if c != client]
     base = {}
@@ -633,12 +635,13 @@ def assign_clients(ins: Instance, open_depots: list[str], s: SearchConfig,
 def _insertion_delta(ins: Instance, depot: str, kind: str,
                      seq: list[str], item: str, pos: int,
                      closed: bool = False) -> float:
-    """Incremento dirigido; los extremos abiertos se mantienen libres.
+    # """Incremento dirigido; los extremos abiertos se mantienen libres.
 
-    DELIVERY ancla únicamente la salida depósito->primer cliente.
-    PICKUP ancla únicamente el último cliente->depósito.
-    closed=True ancla ambos extremos para estimar el coste de una ruta sola.
-    """
+#
+    # DELIVERY ancla únicamente la salida depósito->primer cliente.
+    # PICKUP ancla únicamente el último cliente->depósito.
+    # closed=True ancla ambos extremos para estimar el coste de una ruta sola.
+    # """
     previous = seq[pos - 1] if pos else (depot if closed or kind == 'DELIVERY' else None)
     following = seq[pos] if pos < len(seq) else (depot if closed or kind == 'PICKUP' else None)
     return ((ins.d(previous, item) if previous is not None else 0.0)
@@ -821,7 +824,7 @@ def construct_solution(ins: Instance, selected: CombinationLog, s: SearchConfig,
 
 
 # ======================== MÓDULO CONSERVADO: validation.py ========================
-# """Validador independiente: recompone cargas, arcos, coberturas y costos desde la instancia."""
+# Validador independiente: recompone cargas, arcos, coberturas y costos desde la instancia.
 from collections import Counter, defaultdict
 import math
 
@@ -1021,12 +1024,11 @@ def validate_solution(ins: Instance, sol: Solution) -> list[str]:
 
 
 # ======================== MÓDULO CONSERVADO: search.py ========================
-# """Multiarranque, memoria de élite y terminación por construcciones completadas.
+# Multiarranque, memoria de élite y terminación por construcciones completadas.
 #
 # Solo se poda mediante el costo obligatorio de apertura frente al costo COMPLETO
 # validado del incumbente, siempre que transporte >= 0. No se utiliza distancia
 # estimada como cota inferior ni se confunde fallo de construcción con infactibilidad.
-# """
 import copy
 import math
 import random
@@ -1035,7 +1037,7 @@ from time import perf_counter
 
 
 def signature(solution: Solution) -> tuple:
-    """Estructura canónica, independiente del número de vehículo u orden de rutas."""
+    # """Estructura canónica, independiente del número de vehículo u orden de rutas."""
     routes = tuple(sorted((r.depot_id, tuple((s.node_id,s.operation) for s in r.stops)) for r in solution.routes))
     return tuple(sorted(solution.open_depots)), tuple(sorted(solution.assignment.items())), routes
 
@@ -1103,15 +1105,16 @@ def multi_start(ins: Instance, s: SearchConfig,
                 planned_schedule: list[str] | None = None,
                 on_feasible=None, deterministic_seen=None,
                 explore_extended=False) -> RunResult:
-    """Fase definitiva reproducible por número de construcciones; DOE fijo.
+    # """Fase definitiva reproducible por número de construcciones; DOE fijo.
 
-    Distribución adaptativa sin porcentajes: ensanchar progresivamente el número
-    de configuraciones probadas según ceil(sqrt(arranques+1)) y, entre las ya
-    exploradas, reforzar las no dominadas en (costo real, oportunidades recibidas).
-    La selección de nuevas combinaciones usa únicamente el costo de apertura
-    como orden de visita, no como estimación del transporte ni como infactibilidad.
-    La duración se mide, pero NO interviene en ninguna decisión ni terminación.
-    """
+#
+    # Distribución adaptativa sin porcentajes: ensanchar progresivamente el número
+    # de configuraciones probadas según ceil(sqrt(arranques+1)) y, entre las ya
+    # exploradas, reforzar las no dominadas en (costo real, oportunidades recibidas).
+    # La selección de nuevas combinaciones usa únicamente el costo de apertura
+    # como orden de visita, no como estimación del transporte ni como infactibilidad.
+    # La duración se mide, pero NO interviene en ninguna decisión ni terminación.
+    # """
     s.validate()
     # Condición para poda matemáticamente válida, sin otros costos negativos.
     if ins.cost_per_km < 0 or any(d.opening_cost < 0 for d in ins.depots.values()) or any(
@@ -1263,10 +1266,11 @@ def multi_start(ins: Instance, s: SearchConfig,
             return None
 
         def best_revisit():
-            """Frente no dominado (costo REAL validado, nº de oportunidades).
+            # """Frente no dominado (costo REAL validado, nº de oportunidades).
 
-            Todos los desempates usan identificadores estables; nunca duración.
-            """
+#
+            # Todos los desempates usan identificadores estables; nunca duración.
+            # """
             observed = [c for c in ordered if c.attempts > 0 and not prunable(c)]
             feasible = [c for c in observed if c.config_id in memory.best_by_config]
             if feasible:
@@ -1372,9 +1376,8 @@ def multi_start(ins: Instance, s: SearchConfig,
 
 
 # ======================== MÓDULO CONSERVADO: excel_io.py ========================
-# """Archivo único Excel bidireccional para conservar soluciones completas de Fase I.
+# Archivo único Excel bidireccional para conservar soluciones completas de Fase I.
 # No utiliza JSON ni pickle como formato de intercambio.
-# """
 from collections import defaultdict
 from pathlib import Path
 import pandas as pd
@@ -1584,11 +1587,12 @@ def _boolean(value):
 
 
 def read_results_excel(path: str, instance: Instance | None = None):
-    """Reconstruye todas las soluciones exportadas; con instancia, las revalida.
+    # """Reconstruye todas las soluciones exportadas; con instancia, las revalida.
 
-    Devuelve diccionario: solutions, best_global, alternatives, best_by_config.
-    Los valores de nodos se leen como texto, incluso si parecen numéricos.
-    """
+#
+    # Devuelve diccionario: solutions, best_global, alternatives, best_by_config.
+    # Los valores de nodos se leen como texto, incluso si parecen numéricos.
+    # """
     sheets = pd.read_excel(path,sheet_name=None,engine='openpyxl',dtype=str)
     missing = set(COLUMNS)-set(sheets)
     if missing:
@@ -1660,7 +1664,7 @@ def read_results_excel(path: str, instance: Instance | None = None):
 
 
 # ======================== MÓDULO CONSERVADO: plotting.py ========================
-# """Mapa con coordenadas disponibles, o diagrama esquemático sin georreferenciar."""
+# Mapa con coordenadas disponibles, o diagrama esquemático sin georreferenciar.
 from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
@@ -1783,24 +1787,18 @@ def _resolve_file(value: str) -> str:
 def setup_instance(filepaths=None, depot_cost_basis='investment',
                    vehicle_rental_daily=147572.55):
     f = {**FILES_DEFAULT, **(filepaths or {})}
-    # Adaptación exclusiva de lectura: las instancias 05–25 incluyen las
-    # cuatro fuentes en un único Excel. No cambian los objetos ni los algoritmos.
-    rutas = {k: _resolve_file(f[k]) for k in
-             ('bodegas', 'clientes', 'distancias', 'tiempos')}
-    libro_unico = len(set(rutas.values())) == 1
     cfg = InputConfig(
-        depots_file=rutas['bodegas'],
-        clients_file=rutas['clientes'],
-        distance_file=rutas['distancias'],
-        time_file=rutas['tiempos'],
+        depots_file=_resolve_file(f['bodegas']),
+        clients_file=_resolve_file(f['clientes']),
+        distance_file=_resolve_file(f['distancias']),
+        time_file=_resolve_file(f['tiempos']),
         depots_sheet='Hoja1', clients_sheet='Sheet1',
-        distance_sheet='Distancias' if libro_unico else 'Distancias_km',
-        time_sheet='Tiempos' if libro_unico else 'Tiempos_min',
+        distance_sheet='Distancias_km', time_sheet='Tiempos_min',
         depot_id='ID', depot_capacity='Capacidad (Unidades)',
         depot_cost='Costo Fijo Apertura ($ COP)',
         depot_cost_basis=depot_cost_basis, client_id='Cliente',
         delivery='Demanda de Entrega', pickup='Demanda de Recogida',
-        matrix_row_id='ID' if libro_unico else 'Origen / Destino',
+        matrix_row_id='Origen / Destino',
         depot_x='Longitud', depot_y='Latitud',
         client_x='Longitud', client_y='Latitud')
     s = SearchConfig(execution_mode='budget', construction_budget=72,
@@ -1818,7 +1816,7 @@ def setup_instance(filepaths=None, depot_cost_basis='investment',
 
 
 def _structural_fingerprint(result):
-    """Huella lógica: NO incluye tiempos, fechas ni datos binarios de Excel."""
+    # """Huella lógica: NO incluye tiempos, fechas ni datos binarios de Excel."""
     # Sin hash() de Python (sal aleatoria por proceso), usando SHA256 canónico.
     import json
     def sig(sol):
@@ -1886,13 +1884,14 @@ def _paired_budget_test(rows, budget_a=72, budget_b=100):
 
 
 def _budget_decision(pairs):
-    """Criterio registrado previamente: evidencia de ahorro medio pareado.
+    # """Criterio registrado previamente: evidencia de ahorro medio pareado.
 
-    100 si el intervalo de confianza bilateral t 95% para (C72-C100) queda
-    completamente por encima de cero y ambos presupuestos producen solución.
-    De lo contrario 72 y se reporta que no se ha demostrado beneficio del costo.
-    Evita introducir una tolerancia económica o un puntaje de pesos arbitrarios.
-    """
+#
+    # 100 si el intervalo de confianza bilateral t 95% para (C72-C100) queda
+    # completamente por encima de cero y ambos presupuestos producen solución.
+    # De lo contrario 72 y se reporta que no se ha demostrado beneficio del costo.
+    # Evita introducir una tolerancia económica o un puntaje de pesos arbitrarios.
+    # """
     from scipy.stats import t as student_t
     diffs=[r['ahorro_100'] for r in pairs if r['ahorro_100'] is not None]
     if len(diffs)<2:
@@ -1908,11 +1907,12 @@ def _budget_decision(pairs):
 
 
 def compare_budgets(ins,base,seeds=BUDGET_SEEDS,verbose=True):
-    """Diez semillas PREFIJADAS; presupuestos pareados y misma trayectoria inicial.
+    # """Diez semillas PREFIJADAS; presupuestos pareados y misma trayectoria inicial.
 
-    En una semilla, los primeros 72 intentos de la ejecución de 100 son
-    idénticos a los de 72 si datos, código, parámetros y entorno son iguales.
-    """
+#
+    # En una semilla, los primeros 72 intentos de la ejecución de 100 son
+    # idénticos a los de 72 si datos, código, parámetros y entorno son iguales.
+    # """
     results=[]; tracking=[]; best_result=None
     saved_solutions={}  # (semilla, presupuesto) -> deepcopy de la mejor solución validada
     for seed in seeds:
@@ -1991,12 +1991,13 @@ def _doe_order(x):
 
 
 def _choose_hybrid_on_training(rows, ordered):
-    """Comparar los dos mejores híbridos con semillas PAREADAS del entrenamiento.
+    # """Comparar los dos mejores híbridos con semillas PAREADAS del entrenamiento.
 
-    Si el IC95% de su diferencia media contiene cero, el costo no distingue
-    claramente ambas alternativas: preferir menor desviación observada,
-    luego menor tiempo. Nunca examina el holdout para hacer esta selección.
-    """
+#
+    # Si el IC95% de su diferencia media contiene cero, el costo no distingue
+    # claramente ambas alternativas: preferir menor desviación observada,
+    # luego menor tiempo. Nunca examina el holdout para hacer esta selección.
+    # """
     from scipy.stats import t as student_t
     finalists=[x for x in ordered if x['geometric_p']<1.0]
     first=finalists[0]
@@ -2026,12 +2027,13 @@ def _choose_hybrid_on_training(rows, ordered):
 def calibrate_hybrid(ins,base,verification_budget=72,
                      calibration_budget=DOE_CALIBRATION_BUDGET,
                      seeds=CALIBRATION_SEEDS,holdout=HOLDOUT_SEEDS):
-    """DOE 4x3 híbrido + 3 referencias deterministas NO pareadas.
+    # """DOE 4x3 híbrido + 3 referencias deterministas NO pareadas.
 
-    Calibración: mismo número de construcciones por tratamiento (36 por semilla
-    inicialmente). Posteriormente top 2 y determinista con presupuesto final
-    seleccionado (72/100), usando semillas NUEVAS no empleadas para elegir.
-    """
+#
+    # Calibración: mismo número de construcciones por tratamiento (36 por semilla
+    # inicialmente). Posteriormente top 2 y determinista con presupuesto final
+    # seleccionado (72/100), usando semillas NUEVAS no empleadas para elegir.
+    # """
     from itertools import product
     combos=list(product(BIAS_LEVELS,SPLIT_LEVELS)) + [(1.0,r) for r in SPLIT_LEVELS]
     rows=[]
@@ -2101,7 +2103,7 @@ SPLIT_EXTENSION_HOLDOUT_SEEDS = (9301, 9302, 9303, 9304, 9305)
 
 
 def _split_experiment_run(ins, base, seed, split_ratio, budget=72):
-    """Una repetición completa con presupuesto fijo, heurística híbrida intacta."""
+    # """Una repetición completa con presupuesto fijo, heurística híbrida intacta."""
     cfg = _replace(base, execution_mode='budget', geometric_p=0.95,
                    cluster_split_ratio=split_ratio, construction_budget=budget,
                    seed=int(seed))
@@ -2131,7 +2133,7 @@ def _split_summary(rows, ratio):
 
 
 def _split_ranking(row):
-    """Factibilidad > costo medio > dispersión > rutas > tiempo, sin pesos."""
+    # """Factibilidad > costo medio > dispersión > rutas > tiempo, sin pesos."""
     return (-row['ejecuciones_con_solucion'], -row['factibles'],
             row['costo_medio'] if row['costo_medio'] is not None else math.inf,
             row['costo_sd'] if row['costo_sd'] is not None else math.inf,
@@ -2140,7 +2142,7 @@ def _split_ranking(row):
 
 
 def _paired_confidence(train, ratio_a, ratio_b, confidence=0.95):
-    """IC t pareado de ahorro (costo de B - costo de A); sin umbral del 1%."""
+    # """IC t pareado de ahorro (costo de B - costo de A); sin umbral del 1%."""
     from scipy.stats import t as student_t
     a={r['semilla']:r['costo_total'] for r in train if r['cluster_split_ratio']==ratio_a}
     b={r['semilla']:r['costo_total'] for r in train if r['cluster_split_ratio']==ratio_b}
@@ -2156,13 +2158,14 @@ def _paired_confidence(train, ratio_a, ratio_b, confidence=0.95):
 
 
 def _controlled_deterministic_comparison(ins, base, seeds, ratio, budget=72):
-    """Control determinista PAREADO con idéntica agenda, no una búsqueda distinta.
+    # """Control determinista PAREADO con idéntica agenda, no una búsqueda distinta.
 
-    Para cada semilla, la búsqueda híbrida establece la secuencia de combinaciones
-    y semillas internas. Se reproduce dicha secuencia con p=1 en todas las
-    construcciones. Se reportan explícitamente duplicados deterministas.
-    La referencia determinista alternativa del factorial previo permanece aparte.
-    """
+#
+    # Para cada semilla, la búsqueda híbrida establece la secuencia de combinaciones
+    # y semillas internas. Se reproduce dicha secuencia con p=1 en todas las
+    # construcciones. Se reportan explícitamente duplicados deterministas.
+    # La referencia determinista alternativa del factorial previo permanece aparte.
+    # """
     paired=[]
     for seed in seeds:
         hybrid_config=_replace(base, seed=int(seed), execution_mode='budget',
@@ -2195,14 +2198,15 @@ def calibrate_cluster_split(ins, base,
               calibration_seeds=SPLIT_EXTENSION_TRAIN_SEEDS,
               holdout_seeds=SPLIT_EXTENSION_HOLDOUT_SEEDS,
               budget=72, deterministic_control=True):
-    """Complemento de la calibración previa, NO repite el factorial 4 x 3.
+    # """Complemento de la calibración previa, NO repite el factorial 4 x 3.
 
-    Cinco cierres con p=0.95 y 72 construcciones híbridas por semilla. Primero
-    se selecciona un candidato sobre semillas de calibración. Luego se compara
-    con 0.65 en semillas reservadas. Se cambia 0.65 solo si el IC pareado del
-    95% de ahorro en holdout es estrictamente positivo, sin pérdida de
-    factibilidad. La muestra pequeña limita la generalización de los resultados.
-    """
+#
+    # Cinco cierres con p=0.95 y 72 construcciones híbridas por semilla. Primero
+    # se selecciona un candidato sobre semillas de calibración. Luego se compara
+    # con 0.65 en semillas reservadas. Se cambia 0.65 solo si el IC pareado del
+    # 95% de ahorro en holdout es estrictamente positivo, sin pérdida de
+    # factibilidad. La muestra pequeña limita la generalización de los resultados.
+    # """
     if budget != 72:
         raise ValueError('Esta ampliación debe comparar exactamente 72 construcciones')
     levels=tuple(levels)
@@ -2283,13 +2287,14 @@ DEFAULT_MAIN_SEED_COUNT = 3
 def run_multiseed_multiratio(ins: Instance, base: SearchConfig,
                              seeds: tuple[int, ...] | list[int],
                              split_levels=MAIN_SPLIT_LEVELS, on_feasible=None):
-    """Ejecutar 72 construcciones independientes por (semilla, cierre).
+    # """Ejecutar 72 construcciones independientes por (semilla, cierre).
 
-    No mezcla resultados en las memorias de multi_start ni reutiliza ninguna
-    solución guardada. Selecciona el mínimo entre soluciones REVALIDADAS con
-    costos reales de apertura + transporte. Las métricas de cada ejecución y
-    de cada intento se guardan separadamente de la solución principal.
-    """
+#
+    # No mezcla resultados en las memorias de multi_start ni reutiliza ninguna
+    # solución guardada. Selecciona el mínimo entre soluciones REVALIDADAS con
+    # costos reales de apertura + transporte. Las métricas de cada ejecución y
+    # de cada intento se guardan separadamente de la solución principal.
+    # """
     seeds = tuple(int(v) for v in seeds)
     ratios = tuple(float(v) for v in split_levels)
     if not seeds or len(seeds) != len(set(seeds)):
@@ -2484,12 +2489,13 @@ def _source_file_hashes(input_cfg):
 
 
 def load_saved_split_calibration(path, input_cfg):
-    """Leer selección y evidencia desde el Excel previo; no alterar los datos.
+    # """Leer selección y evidencia desde el Excel previo; no alterar los datos.
 
-    Retorna (datos, motivo). Nunca aplica una selección sin trazabilidad ni
-    si los SHA-256 de las cuatro entradas difieren. El usuario puede guardar
-    el mismo libro bajo otra ruta con --output o --calibration-excel.
-    """
+#
+    # Retorna (datos, motivo). Nunca aplica una selección sin trazabilidad ni
+    # si los SHA-256 de las cuatro entradas difieren. El usuario puede guardar
+    # el mismo libro bajo otra ruta con --output o --calibration-excel.
+    # """
     location = _Path(path).expanduser()
     if not location.is_file():
         return None, 'No existe Excel de calibración guardada'
@@ -2546,15 +2552,15 @@ from time import perf_counter as _perf_counter_ii
 
 @_dataclass_ii
 class LocalConfig:
-    """Límites de esfuerzo (NO alteran demanda, capacidades ni costes)."""
+    # """Límites de esfuerzo (NO alteran demanda, capacidades ni costes)."""
     max_passes: int = 4
-    max_evaluations: int = 30000
-    max_accepted: int = 150
+    max_evaluations: int = 33000
+    max_accepted: int = 165
     # 2 candidatos económicos por operación al cambiar de depósito (no es MILP)
     candidate_insertions: int = 4
     improvement_eps: float = 1e-6
-    max_stage_evaluations: int = 7000
-    max_stage_accepted: int = 30
+    max_stage_evaluations: int = 7500
+    max_stage_accepted: int = 33
 
     def validate(self):
         if min(self.max_passes, self.max_evaluations, self.max_accepted,
@@ -2576,14 +2582,15 @@ class LocalLog:
 
 
 class LocalOptimizer:
-    """First improvement con cuatro vecindarios simples, en orden fijo.
+    # """First improvement con cuatro vecindarios simples, en orden fijo.
 
-    Todos los ahorros son coste REAL de la solución completa. Para evaluar un
-    candidato se reconstruyen los clústeres/segmentos editados y TODOS los
-    emparejamientos y rutas de las bodegas tocadas. Esto es necesario para
-    garantizar que la asignación húngara siga siendo de coste mínimo. Las demás
-    bodegas y sus rutas permanecen inalteradas. No hay aperturas ni cierres.
-    """
+#
+    # Todos los ahorros son coste REAL de la solución completa. Para evaluar un
+    # candidato se reconstruyen los clústeres/segmentos editados y TODOS los
+    # emparejamientos y rutas de las bodegas tocadas. Esto es necesario para
+    # garantizar que la asignación húngara siga siendo de coste mínimo. Las demás
+    # bodegas y sus rutas permanecen inalteradas. No hay aperturas ni cierres.
+    # """
     def __init__(self, ins: Instance, initial: Solution, config: LocalConfig):
         config.validate()
         issues = validate_solution(ins, initial)
@@ -2666,12 +2673,13 @@ class LocalOptimizer:
         self._update_segment(sol,sid)
 
     def _fork_affected(self, affected: set[str], source: Solution | None = None) -> Solution:
-        """Copia aislada de escritura: clústeres/segmentos SOLO de bodegas afectadas.
+        # """Copia aislada de escritura: clústeres/segmentos SOLO de bodegas afectadas.
 
-        Rutas y emparejamientos no afectados son inmutables durante la prueba;
-        _rebuild() sustituye los de depósitos afectados por objetos nuevos.
-        Nunca se alteran las estructuras originales hasta aceptar una mejora.
-        """
+#
+        # Rutas y emparejamientos no afectados son inmutables durante la prueba;
+        # _rebuild() sustituye los de depósitos afectados por objetos nuevos.
+        # Nunca se alteran las estructuras originales hasta aceptar una mejora.
+        # """
         base = self.current if source is None else source
         trial = copy.copy(base)
         trial.open_depots = base.open_depots.copy()
@@ -2686,12 +2694,13 @@ class LocalOptimizer:
         return trial
 
     def _rebuild(self, sol: Solution, affected: set[str]) -> None:
-        """Recomponer solo las bodegas tocadas; actualizar costos incrementalmente.
+        # """Recomponer solo las bodegas tocadas; actualizar costos incrementalmente.
 
-        El resto de rutas y segmentos no cambia: sus importes se toman de la
-        solución actual validada. La validación de cada mejora aceptada vuelve
-        a calcular todos los arcos, cargas y costos sin depender de esta suma.
-        """
+#
+        # El resto de rutas y segmentos no cambia: sus importes se toman de la
+        # solución actual validada. La validación de cada mejora aceptada vuelve
+        # a calcular todos los arcos, cargas y costos sin depender de esta suma.
+        # """
         before_routes = [r for r in self.current.routes if r.depot_id in affected]
         old_km = sum(r.km for r in before_routes)
         old_transport = sum(r.cost for r in before_routes)
@@ -2860,11 +2869,12 @@ class LocalOptimizer:
 
     def _transfer_candidate(self, moves: dict[str,str],
                             choice_limit: int) -> list[Solution]:
-        """Cada traslado mueve ambas operaciones de un cliente, sin dividirlas.
+        # """Cada traslado mueve ambas operaciones de un cliente, sin dividirlas.
 
-        Para swaps se extraen ambas personas ANTES de insertar cualquiera;
-        evita comprobar capacidades contra demandas que ya salieron.
-        """
+#
+        # Para swaps se extraen ambas personas ANTES de insertar cualquiera;
+        # evita comprobar capacidades contra demandas que ya salieron.
+        # """
         affected={self.current.assignment[c] for c in moves} | set(moves.values())
         base=self._fork_affected(affected)
         old_depots={c:base.assignment[c] for c in moves}
@@ -2970,12 +2980,13 @@ from datetime import datetime as _datetime_integrado
 
 
 class CincoMejoresFaseI:
-    """Top cinco EXACTO entre todas las construcciones válidas, sin diversidad artificial.
+    # """Top cinco EXACTO entre todas las construcciones válidas, sin diversidad artificial.
 
-    La firma canónica comprueba instalaciones, asignaciones y rutas. Cada
-    registro es una copia profunda independiente; no se retienen soluciones
-    experimentales ni se reconstruye la Fase I.
-    """
+#
+    # La firma canónica comprueba instalaciones, asignaciones y rutas. Cada
+    # registro es una copia profunda independiente; no se retienen soluciones
+    # experimentales ni se reconstruye la Fase I.
+    # """
     def __init__(self, ins: Instance, limit: int = 5):
         self.ins = ins
         self.limit = limit
@@ -3020,13 +3031,14 @@ class CincoMejoresFaseI:
 
 
 class BusquedaLocalMejorMejora(LocalOptimizer):
-    """Mismos cuatro vecindarios, cambiando solamente first por best improvement.
+    # """Mismos cuatro vecindarios, cambiando solamente first por best improvement.
 
-    Cada barrido examina todos los candidatos que permita el límite explícito
-    del vecindario, compara el costo REAL de las rutas reemparejadas y aplica
-    exactamente el mayor ahorro estricto. Después reinicia ese vecindario.
-    Todos los desempates dependen del orden canónico, nunca del reloj.
-    """
+#
+    # Cada barrido examina todos los candidatos que permita el límite explícito
+    # del vecindario, compara el costo REAL de las rutas reemparejadas y aplica
+    # exactamente el mayor ahorro estricto. Después reinicia ese vecindario.
+    # Todos los desempates dependen del orden canónico, nunca del reloj.
+    # """
     def __init__(self, ins, initial, config):
         super().__init__(ins, initial, config)
         # La fusión tiene el mismo presupuesto independiente que los otros movimientos.
@@ -3036,11 +3048,12 @@ class BusquedaLocalMejorMejora(LocalOptimizer):
         self._detalle_mejor = None
 
     def relocate(self) -> bool:
-        """Reinsertar dentro del mismo segmento o entre rutas del mismo depósito.
+        # """Reinsertar dentro del mismo segmento o entre rutas del mismo depósito.
 
-        El movimiento dentro de una ruta nunca altera la operación de tipo opuesto.
-        Las otras bodegas permanecen intactas al reconstruir el candidato.
-        """
+#
+        # El movimiento dentro de una ruta nunca altera la operación de tipo opuesto.
+        # Las otras bodegas permanecen intactas al reconstruir el candidato.
+        # """
         for depot in sorted(self.current.open_depots):
             routes = sorted((r for r in self.current.routes if r.depot_id == depot),
                             key=lambda r: r.id)
@@ -3086,18 +3099,19 @@ class BusquedaLocalMejorMejora(LocalOptimizer):
 
     def _swap_positions(self, depot: str, kind: str, remaining: list[str],
                         incoming: str) -> list[int]:
-        """Hasta cuatro mejores posiciones según incremento vial DIRIGIDO.
+        # """Hasta cuatro mejores posiciones según incremento vial DIRIGIDO.
 
-        Es un filtro de candidatos, no el costo final: _evaluate calcula
-        el costo real de todas las rutas afectadas y valida la solución.
-        """
+#
+        # Es un filtro de candidatos, no el costo final: _evaluate calcula
+        # el costo real de todas las rutas afectadas y valida la solución.
+        # """
         choices = [(_insertion_delta(self.ins,depot,kind,remaining,incoming,pos),pos)
                    for pos in range(len(remaining)+1)]
         choices.sort(key=lambda x:(x[0],x[1]))
         return [position for _,position in choices[:self.cfg.candidate_insertions]]
 
     def swap(self) -> bool:
-        """Intercambiar operaciones del mismo tipo y explorar posiciones alternativas."""
+        # """Intercambiar operaciones del mismo tipo y explorar posiciones alternativas."""
         for depot in sorted(self.current.open_depots):
             routes = sorted((r for r in self.current.routes if r.depot_id == depot),
                             key=lambda r:r.id)
@@ -3131,13 +3145,14 @@ class BusquedaLocalMejorMejora(LocalOptimizer):
         return False
 
     def fusion(self) -> bool:
-        """Fusionar rutas del mismo depósito si las demandas combinadas caben.
+        # """Fusionar rutas del mismo depósito si las demandas combinadas caben.
 
-        Se unen los segmentos de cada tipo y se eliminan los segmentos vacíos.
-        Después el emparejamiento húngaro reconstruye solo las rutas del
-        depósito afectado. No se exige menos rutas ni se penaliza su número;
-        únicamente se conserva una reducción estricta del costo real.
-        """
+#
+        # Se unen los segmentos de cada tipo y se eliminan los segmentos vacíos.
+        # Después el emparejamiento húngaro reconstruye solo las rutas del
+        # depósito afectado. No se exige menos rutas ni se penaliza su número;
+        # únicamente se conserva una reducción estricta del costo real.
+        # """
         for depot in sorted(self.current.open_depots):
             routes = sorted((r for r in self.current.routes if r.depot_id == depot),
                             key=lambda r:r.id)
@@ -3273,29 +3288,32 @@ from hashlib import sha256 as _sha256_open
 class OpeningConfig:
     enabled: bool = True
     small_instance_threshold: int = 5
-    max_groups_large: int = 28
+    max_groups_large: int = 32
     max_depots_large: int = 6
-    max_evaluations: int = 350  # 0 = sin tope; independiente de otros movimientos
+    max_evaluations: int = 380  # 0 = sin tope; independiente de otros movimientos
     max_accepted: int = 20     # 0 = sin tope
     max_seconds: float = 0.0   # 0 = sin tope
+    max_reassignment_groups_per_depot: int = 14  # Tope moderado por destino y barrido
 
     def validate(self):
         if (self.small_instance_threshold < 0 or self.max_groups_large < 1 or
             self.max_depots_large < 1 or self.max_evaluations < 0 or
-            self.max_accepted < 0 or self.max_seconds < 0):
+            self.max_accepted < 0 or self.max_seconds < 0 or
+            self.max_reassignment_groups_per_depot < 1):
             raise ValueError('Configuración de apertura inválida')
 
 
 class BusquedaLocalConApertura(BusquedaLocalMejorMejora):
-    """Conserva cinco vecindarios originales, añade apertura como sexto.
+    # """Conserva cinco vecindarios originales, añade apertura como sexto.
 
-    Apertura: examina grupos de clientes completos hacia una bodega CERRADA.
-    Para 5 o menos clientes explora todas las combinaciones de clientes y
-    destinos cerrados, salvo límite de seguridad explícito. Para mayores,
-    prioriza grupos de rutas y proximidad; la exploración CONTROLADA no prueba
-    optimalidad local global. Reconstruye con las rutinas originales solamente
-    las bodegas de origen y la nueva bodega. Nunca cierra bodegas.
-    """
+#
+    # Apertura: examina grupos de clientes completos hacia una bodega CERRADA.
+    # Para 5 o menos clientes explora todas las combinaciones de clientes y
+    # destinos cerrados, salvo límite de seguridad explícito. Para mayores,
+    # prioriza grupos de rutas y proximidad; la exploración CONTROLADA no prueba
+    # optimalidad local global. Reconstruye con las rutinas originales solamente
+    # las bodegas de origen y la nueva bodega. Nunca cierra bodegas.
+    # """
     def __init__(self, ins, initial, config, opening_config=None, construction_config=None):
         super().__init__(ins,initial,config)
         self.open_cfg = opening_config or OpeningConfig()
@@ -3362,6 +3380,129 @@ class BusquedaLocalConApertura(BusquedaLocalMejorMejora):
             self.economic_moves.append(snap)
         return done
 
+    def _nearby_groups(self, target):
+        # """Grupos de 2-4 clientes próximos a una bodega (rutas distintas permitidas).
+
+#
+        # Las distancias dirigidas solo ordenan alternativas, nunca sustituyen
+        # al costo diario real, a las capacidades o a la validación completa.
+        # Se conserva el límite de grupos ya configurado para Apertura.
+        # """
+        ins = self.ins
+        available = [c for c in self.current.assignment
+                     if self.current.assignment[c] != target]
+        if len(available) < 2:
+            return []
+        delivery_at_target = sum(ins.clients[c].delivery for c, d in
+                                 self.current.assignment.items() if d == target)
+        capacity_left = ins.depots[target].capacity - delivery_at_target
+        if capacity_left < -EPS:
+            return []
+        # Suma dirigida de ida/vuelta: funciona con matrices asimétricas.
+        to_target = {c: ins.d(target, c) + ins.d(c, target) for c in available}
+        geographic_gain = {
+            c: (ins.d(self.current.assignment[c], c)
+                + ins.d(c, self.current.assignment[c]) - to_target[c])
+            for c in available
+        }
+        # Semillas próximas y semillas con potencial de ahorro: ambas pueden
+        # revelar grupos entre rutas diferentes. Acotar sin generar combinaciones
+        # de los 80 clientes.
+        by_distance = sorted(available, key=lambda c: (to_target[c], c))[:10]
+        by_gain = sorted(available, key=lambda c: (-geographic_gain[c], to_target[c], c))[:10]
+        anchors = list(dict.fromkeys(by_distance + by_gain))
+        # Registrar las rutas en las que aparece cada cliente (entrega/recogida).
+        client_routes = {c: set() for c in available}
+        for route in self.current.routes:
+            for stop in route.stops[1:-1]:
+                if stop.node_id in client_routes:
+                    client_routes[stop.node_id].add(route.id)
+        proposals = set()
+        for anchor in anchors:
+            # Proximidad entre clientes y proximidad a la bodega candidata.
+            neighbors = sorted((c for c in available if c != anchor),
+                key=lambda c: (ins.d(anchor, c) + ins.d(c, anchor)
+                               + 0.5 * (to_target[anchor] + to_target[c]), c))[:5]
+            for size in (2, 3, 4):
+                for rest in _combinations_open(neighbors, size - 1):
+                    group = tuple(sorted((anchor, *rest)))
+                    if sum(ins.clients[c].delivery for c in group) > capacity_left + EPS:
+                        continue
+                    proposals.add(group)
+        def score(group):
+            gain = sum(geographic_gain[c] for c in group)
+            cohesion = sum(min(ins.d(a,b) + ins.d(b,a) for b in group if b != a)
+                           for a in group)
+            return (-gain, cohesion, sum(to_target[c] for c in group), len(group), group)
+        ranked = sorted(proposals, key=score)
+        # Cuota ORIGINAL: no se realizan más reconstrucciones que antes.
+        # Diversificar evita que grupos casi idénticos (p. ej. siempre de 4)
+        # consuman todos los candidatos: reservar rutas distintas y tamaños 2-4.
+        cross_route = [g for g in ranked if not set.intersection(
+            *(client_routes[c] for c in g))]
+        quota = self.open_cfg.max_groups_large
+        selected = []
+        selected_set = set()
+        def append_limited(pool, limit):
+            added = 0
+            for group in pool:
+                if len(selected) >= quota or added >= limit:
+                    break
+                if group not in selected_set:
+                    selected.append(group)
+                    selected_set.add(group)
+                    added += 1
+        append_limited(cross_route, max(1, quota // 3))
+        for size in (2, 3, 4):
+            append_limited((g for g in ranked if len(g) == size),
+                           max(1, quota // 6))
+        append_limited(ranked, quota)
+        return selected
+
+    def reassignment(self):
+        # """Añade traslados conjuntos; conserva luego individuales/intercambios."""
+        for target in sorted(self.current.open_depots):
+            # Presupuesto corto y reproducible por bodega; los operadores
+            # individuales y de intercambio originales siguen disponibles.
+            groups = self._nearby_groups(target)
+            groups = groups[:self.open_cfg.max_reassignment_groups_per_depot]
+            for group in groups:
+                if self.exhausted or 'reassignment' in self.stage_exhausted:
+                    return False
+                if not self._in_budget():
+                    return False
+                if (self.tried['reassignment'] >= self.cfg.max_stage_evaluations
+                        or self.accepted_by_stage['reassignment'] >= self.cfg.max_stage_accepted):
+                    self.stage_exhausted.add('reassignment')
+                    return False
+                affected = {self.current.assignment[c] for c in group} | {target}
+                # No evaluar dos veces la misma distribución durante un barrido.
+                key = ('grupo', target, group,
+                       tuple(sorted(self.current.assignment.items())))
+                if key in self._trial_signatures_seen:
+                    continue
+                self._trial_signatures_seen.add(key)
+                self.count += 1
+                self.tried['reassignment'] += 1
+                trial, actual_affected = self._reconstruct_group(target, group)
+                if trial is None:
+                    continue
+                if trial.total_cost >= self.current.total_cost - self.cfg.improvement_eps:
+                    continue
+                if (self._mejor_barrido is not None and
+                    trial.total_cost >= self._mejor_barrido.total_cost - self.cfg.improvement_eps):
+                    continue
+                failures = validate_solution(self.ins, trial)
+                if failures:
+                    raise AssertionError('Reasignación conjunta inválida: '
+                                         + '; '.join(failures[:12]))
+                self._mejor_barrido = trial
+                self._detalle_mejor = ('reassignment',
+                    'grupo de proximidad ' + ','.join(group) + ' -> ' + target,
+                    tuple(sorted(actual_affected)))
+        # El operador original sigue intacto: traslados individuales e intercambios.
+        return super().reassignment()
+
     def _candidate_groups(self, target):
         available=sorted(c for c,d in self.current.assignment.items() if d!=target)
         if len(self.ins.clients)<=self.open_cfg.small_instance_threshold:
@@ -3398,8 +3539,31 @@ class BusquedaLocalConApertura(BusquedaLocalMejorMejora):
                 self.ins.d(c,self.current.assignment[c])) for c in group)
             return (estimate,len(group),group)
         groups.sort(key=rank)
-        truncated=len(groups)>self.open_cfg.max_groups_large
-        return groups[:self.open_cfg.max_groups_large],truncated
+        # Además de los grupos originales, explorar conjuntos de proximidad
+        # geográfica de 2-4 clientes sin exigir una ruta común.
+        proximity = self._nearby_groups(target)
+        quota = self.open_cfg.max_groups_large
+        # Sin aumentar el presupuesto, reservar espacio para: agrupaciones
+        # geográficas, grupos de rutas y traslados individuales. El resto se
+        # llena por la prioridad existente; no se descarta por costo estimado.
+        chosen = []
+        seen_groups = set()
+        def add_groups(pool, limit):
+            count = 0
+            for group in pool:
+                if len(chosen) >= quota or count >= limit:
+                    break
+                if group not in seen_groups:
+                    chosen.append(group)
+                    seen_groups.add(group)
+                    count += 1
+        add_groups(proximity, max(1, quota // 3))
+        add_groups((g for g in groups if len(g) > 1), max(1, quota // 3))
+        add_groups((g for g in groups if len(g) == 1), max(1, quota // 6))
+        add_groups(groups, quota)
+        add_groups(proximity, quota)
+        truncated = len(set(groups) | set(proximity)) > len(chosen)
+        return chosen, truncated
 
     def _reconstruct_group(self, target, group):
         ins=self.ins
@@ -3448,14 +3612,21 @@ class BusquedaLocalConApertura(BusquedaLocalMejorMejora):
         small=len(self.ins.clients)<=self.open_cfg.small_instance_threshold
         if not small and len(closed)>self.open_cfg.max_depots_large:
             self.opening_incomplete=True
-        # Proximidad estimada de las bodegas actualmente asignadas.
+        # Priorizar bodegas con potencial de acercar pequeños GRUPOS a su
+        # instalación. El cálculo dirigido es un orden de visita aproximado:
+        # NO es una cota ni determina si se acepta o descarta la bodega.
         def target_rank(d):
-            # Conservar el ranking original de proximidad. El costo diario
-            # se compara de manera exacta después de reconstruir cada opción.
-            # Solo en empate vial se da prioridad al menor costo de apertura.
-            return (sum(min(self.ins.d(d,c),self.ins.d(c,d))
-                        for c in self.ins.clients),
-                    self.ins.depots[d].opening_cost, d)
+            ins = self.ins
+            improvement = sorted((
+                ins.d(self.current.assignment[c], c)
+                + ins.d(c, self.current.assignment[c])
+                - ins.d(d, c) - ins.d(c, d)
+                for c in ins.clients
+                if ins.clients[c].delivery <= ins.depots[d].capacity + EPS
+            ), reverse=True)
+            potential = sum(max(0.0, v) for v in improvement[:4])
+            estimated_net = potential * ins.cost_per_km - ins.depots[d].opening_cost
+            return (-estimated_net, ins.depots[d].opening_cost, d)
         closed.sort(key=target_rank)
         if not small:
             closed=closed[:self.open_cfg.max_depots_large]
@@ -3552,7 +3723,7 @@ class BusquedaLocalConApertura(BusquedaLocalMejorMejora):
 
 def _solo_oficial(sol: Solution, label: str, config: SearchConfig,
                   extra: dict | None = None) -> RunResult:
-    """Vista de UN resultado para el Excel, no borra el top cinco en RAM."""
+    # """Vista de UN resultado para el Excel, no borra el top cinco en RAM."""
     params = {f.name: getattr(config, f.name) for f in fields(config)}
     params.update(extra or {})
     params['fase'] = label
@@ -3563,7 +3734,7 @@ def _solo_oficial(sol: Solution, label: str, config: SearchConfig,
 
 
 def _excel_memoria(ins: Instance, result: RunResult) -> BytesIO:
-    """Genera el esquema Excel original directamente en RAM, sin archivo temporal."""
+    # """Genera el esquema Excel original directamente en RAM, sin archivo temporal."""
     data = BytesIO()
     export_results_excel(data, ins, result)
     data.seek(0)
@@ -3576,7 +3747,7 @@ def _datos_excel(book: BytesIO) -> dict[str, pd.DataFrame]:
 
 
 def recuperar_excel_consolidado(path: str, phase: str, ins: Instance):
-    """Recuperar desde libro consolidado la Fase I o II, con su validador."""
+    # """Recuperar desde libro consolidado la Fase I o II, con su validador."""
     if phase not in ('FI','FII'):
         raise ValueError('phase debe ser FI o FII')
     data = pd.read_excel(path,sheet_name=None,engine='openpyxl',dtype=object)
@@ -3606,7 +3777,7 @@ def exportar_excel_integrado(path: str, ins: Instance,
                               comparison: dict, *, top5=None,
                               lotes=None, tiempos=None, ciclos=None,
                               evolucion_fase1=None, ahorro_etapas=None) -> str:
-    """Excel único con UNA solución oficial por fase y trazabilidad verificada."""
+    # """Excel único con UNA solución oficial por fase y trazabilidad verificada."""
     first_sheets=_datos_excel(_excel_memoria(ins,_solo_oficial(first,'I',base,metrics)))
     final_sheets=_datos_excel(_excel_memoria(ins,_solo_oficial(final,'II',base,metrics)))
     path=str(Path(path).resolve())
@@ -3684,13 +3855,14 @@ def construir_hasta_estancamiento(ins: Instance, base: SearchConfig,
         collector: CincoMejoresFaseI, stagnation_batches: int = 2,
         max_batches: int | None = None, max_total_constructions: int | None = None,
         constructions_per_pair: int = 72):
-    """Ejecuta N construcciones POR combinación (semilla, cierre) en cada lote.
+    # """Ejecuta N construcciones POR combinación (semilla, cierre) en cada lote.
 
-    El lote completo consta de len(semillas) * len(cierres) * N intentos.
-    Los siguientes lotes usan semillas distintas, y el contador de lotes
-    estancados vuelve a cero al mejorar el mejor costo GLOBAL validado.
-    Un límite de seguridad jamás se interpreta como convergencia matemática.
-    """
+#
+    # El lote completo consta de len(semillas) * len(cierres) * N intentos.
+    # Los siguientes lotes usan semillas distintas, y el contador de lotes
+    # estancados vuelve a cero al mejorar el mejor costo GLOBAL validado.
+    # Un límite de seguridad jamás se interpreta como convergencia matemática.
+    # """
     if not initial_seeds or len(set(initial_seeds)) != len(initial_seeds):
         raise ValueError('Las semillas iniciales deben ser distintas')
     if not ratios or len(set(ratios)) != len(ratios):
@@ -3829,11 +4001,12 @@ def _status_local(opt: BusquedaLocalMejorMejora, cfg: LocalConfig) -> str:
     return 'SIN_MEJORA_EN_BARRIDO_EXPLORADO'
 
 def ejecutar_integrado(argv=None):
-    """Fase I por lotes; Fase II original de tres ciclos y mejor mejora POR vecindario.
+    # """Fase I por lotes; Fase II original de tres ciclos y mejor mejora POR vecindario.
 
-    Sin Or-opt ni selección global; movimiento acotado de apertura adicional.
-    Si un límite de seguridad se agota, la ejecución se clasifica como incompleta.
-    """
+#
+    # Sin Or-opt ni selección global; movimiento acotado de apertura adicional.
+    # Si un límite de seguridad se agota, la ejecución se clasifica como incompleta.
+    # """
     ap=_parser_integrado.ArgumentParser(description='LogiData: construcción por lotes + búsqueda local original de tres ciclos')
     for name in ('bodegas','clientes','distancias','tiempos'):
         ap.add_argument('--'+name,default=FILES_DEFAULT[name])
@@ -3856,15 +4029,15 @@ def ejecutar_integrado(argv=None):
     ap.add_argument('--additional-cycles',type=int,default=3,
                     help='Hasta tres ciclos adicionales desde la mejor Fase II, presupuestos renovados')
     ap.add_argument('--max-passes',type=int,default=4)
-    ap.add_argument('--max-evaluations',type=int,default=30000)
-    ap.add_argument('--max-accepted',type=int,default=150)
-    ap.add_argument('--max-stage-evaluations',type=int,default=7000)
-    ap.add_argument('--max-stage-accepted',type=int,default=30)
+    ap.add_argument('--max-evaluations',type=int,default=33000)
+    ap.add_argument('--max-accepted',type=int,default=165)
+    ap.add_argument('--max-stage-evaluations',type=int,default=7500)
+    ap.add_argument('--max-stage-accepted',type=int,default=33)
     ap.add_argument('--candidate-insertions',type=int,default=4,
                     help='Las cuatro posiciones originales por delta vial dirigido')
     ap.add_argument('--disable-opening',action='store_true',help='Desactivar solo el nuevo movimiento')
     ap.add_argument('--opening-small-threshold',type=int,default=5)
-    ap.add_argument('--opening-max-groups',type=int,default=28)
+    ap.add_argument('--opening-max-groups',type=int,default=32)
     ap.add_argument('--opening-max-depots',type=int,default=6)
     ap.add_argument('--opening-max-evaluations',type=int,default=None,
                     help='0 desactiva el tope; para 5 clientes permite barrido completo')
@@ -3899,7 +4072,7 @@ def ejecutar_integrado(argv=None):
     lc=LocalConfig(args.max_passes,args.max_evaluations,args.max_accepted,
         args.candidate_insertions,max_stage_evaluations=args.max_stage_evaluations,
         max_stage_accepted=args.max_stage_accepted)
-    opening_budget=(0 if len(ins.clients)<=args.opening_small_threshold else 350) if args.opening_max_evaluations is None else args.opening_max_evaluations
+    opening_budget=(0 if len(ins.clients)<=args.opening_small_threshold else 380) if args.opening_max_evaluations is None else args.opening_max_evaluations
     opening_cfg=OpeningConfig(not args.disable_opening,args.opening_small_threshold,
         args.opening_max_groups,args.opening_max_depots,opening_budget,
         args.opening_max_accepted,args.opening_max_seconds)
@@ -4090,12 +4263,13 @@ def ejecutar_integrado(argv=None):
 def _logidata_dashboard():
     #!/usr/bin/env python3
     # -*- coding: utf-8 -*-
-    """Dashboard LogiData: visualizador independiente (no ejecuta la heurística).
+    # """Dashboard LogiData: visualizador independiente (no ejecuta la heurística).
 
-    Inicio: streamlit run LogiData_Dashboard.py
-    Lee tanto el Excel histórico (solo FII detallada) como el Excel instrumentado
-    (con FI y FII detalladas y trazabilidad mínima). No inventa valores ausentes.
-    """
+#
+    # Inicio: streamlit run LogiData_Dashboard.py
+    # Lee tanto el Excel histórico (solo FII detallada) como el Excel instrumentado
+    # (con FI y FII detalladas y trazabilidad mínima). No inventa valores ausentes.
+    # """
 
     from collections import Counter
     from io import BytesIO
@@ -4111,7 +4285,7 @@ def _logidata_dashboard():
     import streamlit as st
 
     st.set_page_config(page_title='LogiData | Centro de resultados', page_icon='🔷',
-                       layout='wide', initial_sidebar_state='expanded')
+                       layout='wide', initial_sidebar_state='collapsed')
 
     NAVY = '#17365E'
     TEAL = '#138F8A'
@@ -4128,6 +4302,9 @@ def _logidata_dashboard():
     html, body, [data-testid="stAppViewContainer"], [data-testid="stSidebar"] {
        font-family:Inter,system-ui,-apple-system,Segoe UI,Arial,sans-serif}
     [data-testid="stAppViewContainer"] {background:#F6F9FD;color:#19304C}
+    /* Panel lateral retirado: dashboard de una sola ejecución. */
+    [data-testid="stSidebar"], [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] {display:none !important}
     .block-container {padding-top:1.0rem;padding-bottom:2.1rem;max-width:1520px}
     html,body {font-size:16px}
     [data-testid="stMarkdownContainer"] {font-size:1.04rem}
@@ -4268,7 +4445,7 @@ def _logidata_dashboard():
         return f'Alternativa {int(m.group(1))}' if m else 'Alternativa'
 
     def user_facing_table(df):
-        """Presentation copy: IDs stay unchanged in official Excel and CSV exports."""
+        # """Presentation copy: IDs stay unchanged in official Excel and CSV exports."""
         if not isinstance(df, pd.DataFrame):
             return df
         shown = df.copy()
@@ -4393,7 +4570,7 @@ def _logidata_dashboard():
 
 
     def build_phase(book, phase):
-        """Normaliza SOLO nombres de columnas; mantiene valores tal como constan en Excel."""
+        # """Normaliza SOLO nombres de columnas; mantiene valores tal como constan en Excel."""
         r = phase_sheet(book, phase, 'Rutas')
         v = phase_sheet(book, phase, 'Visitas')
         a = phase_sheet(book, phase, 'Asignaciones')
@@ -4525,7 +4702,7 @@ def _logidata_dashboard():
 
 
     def map_figure(routes, visits, coords, title='Rutas LogiData', modo_coordenadas=False, map_order_route=None):
-        """Map of actual recorded visit order; connecting lines are schematic."""
+        # """Map of actual recorded visit order; connecting lines are schematic."""
         if coords.empty or routes.empty or visits.empty:
             return None
         coords0 = coords.copy()
@@ -4727,7 +4904,7 @@ def _logidata_dashboard():
 
 
     def ordered_visit_table(stops, depot_id):
-        """Vista ordenada de la ruta; no modifica las operaciones exportadas."""
+        # """Vista ordenada de la ruta; no modifica las operaciones exportadas."""
         if stops.empty:
             return pd.DataFrame()
         pretty = stops.sort_values('orden').copy()
@@ -4774,7 +4951,7 @@ def _logidata_dashboard():
                 f'de {fmt_num(a,2)} a {fmt_num(b,2)} {unit}.')
 
     def verify_phase(pdata, cost_per_km=None, vehicle_capacity=2500):
-        """Auditoría independiente a partir de hojas exportadas, nunca asume OK."""
+        # """Auditoría independiente a partir de hojas exportadas, nunca asume OK."""
         checks=[]
         r,v,a,b,s=(pdata[k] for k in ('routes','visits','assignments','depots','solutions'))
         def add(name, result, detail, available=True):
@@ -4879,11 +5056,12 @@ def _logidata_dashboard():
 
 
     def _png_de_respaldo(fig):
-        """PNG local sin Chrome: dibuja los datos del gráfico, nunca cifras inventadas.
+        # """PNG local sin Chrome: dibuja los datos del gráfico, nunca cifras inventadas.
 
-        Cuando no hay Kaleido se usa matplotlib. Para mapas conserva las
-        coordenadas y polilíneas reales disponibles, sin callejero.
-        """
+#
+        # Cuando no hay Kaleido se usa matplotlib. Para mapas conserva las
+        # coordenadas y polilíneas reales disponibles, sin callejero.
+        # """
         import matplotlib
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
@@ -4975,43 +5153,19 @@ def _logidata_dashboard():
         return fig
 
 
-    st.sidebar.markdown('''<div class="ld-brand"><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" fill="none" aria-label="Camión azul de LogiData">
-<rect x="2" y="2" width="44" height="44" rx="12" fill="#E8F3FF"/>
-<path d="M9 18h21v16H9z" rx="2" fill="#267BD1"/>
-<path d="M30 23h5.6l6 7v4H30z" fill="#14549E"/>
-<path d="M33 25.5h2l3.3 4H33z" fill="#D4EBFF"/>
-<path d="M6 22h5M4 27h7" stroke="#68A5E4" stroke-width="2" stroke-linecap="round"/>
-<circle cx="16" cy="35" r="4" fill="#123D76" stroke="#E8F3FF" stroke-width="1.5"/>
-<circle cx="35" cy="35" r="4" fill="#123D76" stroke="#E8F3FF" stroke-width="1.5"/>
-<circle cx="16" cy="35" r="1.4" fill="#D6EAFE"/>
-<circle cx="35" cy="35" r="1.4" fill="#D6EAFE"/>
-</svg>
-       <div><div class="ld-brand-name">Logi<span>Data</span></div>
-       <div class="ld-brand-caption">BOGOTÁ · LOGÍSTICA</div></div></div>''',
-       unsafe_allow_html=True)
-    arg_dir = None
-    if '--results-dir' in sys.argv:
-        i = sys.argv.index('--results-dir')
-        if i + 1 < len(sys.argv):
-            arg_dir = sys.argv[i + 1]
-    resultados_dir = Path(arg_dir).expanduser().resolve() if arg_dir else Path(__file__).resolve().parent / 'resultados_logidata'
-    archivos_instancias = sorted(resultados_dir.glob('LogiData_Resultados_*_clientes.xlsx')) if resultados_dir.is_dir() else []
+    # Un solo resultado oficial por ejecución. Nunca se elige una instancia en la web.
     cli_excel = None
     if '--excel' in sys.argv:
-        i = sys.argv.index('--excel')
-        if i + 1 < len(sys.argv):
-            cli_excel = Path(sys.argv[i+1]).expanduser().resolve()
-    catalogo = list(archivos_instancias)
-    if cli_excel is not None and cli_excel.is_file() and cli_excel not in catalogo:
-        catalogo.insert(0,cli_excel)
-    if not catalogo:
-        fallback = Path(__file__).resolve().parent / 'LogiData_Fases_I_II_consolidado.xlsx'
-        if fallback.is_file(): catalogo=[fallback]
-    archivo_seleccionado = st.sidebar.selectbox('Instancia / ejecución',catalogo,
-        index=catalogo.index(cli_excel) if cli_excel in catalogo else 0,
-        format_func=lambda p: p.stem.replace('LogiData_Resultados_','').replace('_',' ')) if catalogo else None
-    source_bytes=archivo_seleccionado.read_bytes() if archivo_seleccionado is not None else None
-    source_name=archivo_seleccionado.name if archivo_seleccionado is not None else ''
+        arg_pos = sys.argv.index('--excel')
+        if arg_pos + 1 < len(sys.argv):
+            cli_excel = Path(sys.argv[arg_pos + 1]).expanduser().resolve()
+    output_default = Path(__file__).resolve().parent / 'LogiData_Fases_I_II_consolidado.xlsx'
+    archivo_seleccionado = cli_excel if cli_excel is not None else output_default
+    source_bytes = archivo_seleccionado.read_bytes() if archivo_seleccionado.is_file() else None
+    source_name = archivo_seleccionado.name
+    resultados_dir = Path(__file__).resolve().parent / 'resultados_logidata'
+    # La comparación histórica, si existe, sigue siendo automática; no constituye un selector.
+    archivos_instancias = sorted(resultados_dir.glob('LogiData_Resultados_*_clientes.xlsx')) if resultados_dir.is_dir() else []
     st.markdown('''<div class="ld-hero"><div class="ld-hero-mark"><svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" fill="none" aria-label="Camión azul de LogiData">
 <rect x="2" y="2" width="44" height="44" rx="12" fill="#E8F3FF"/>
 <path d="M9 18h21v16H9z" rx="2" fill="#267BD1"/>
@@ -5025,10 +5179,11 @@ def _logidata_dashboard():
 </svg></div>
       <div><div class="ld-eyebrow">LOGIDATA · ANÁLISIS ACADÉMICO</div>
       <div class="ld-title">Resultados de localización y ruteo</div>
-      <p class="ld-description">Bodegas, rutas, costos y ahorros de cada instancia · Bogotá</p></div></div>''',
+      <p class="ld-description">Bodegas, rutas, costos y ahorros de la ejecución · Bogotá</p></div></div>''',
       unsafe_allow_html=True)
     if source_bytes is None:
-        st.info('No hay ejecuciones guardadas. Ejecuta una instancia desde Python para visualizar sus resultados.')
+        st.error(f'No se encontró el Excel de resultados: {archivo_seleccionado}')
+        st.info('Ejecuta el programa para generar el consolidado o utiliza --view con el Excel que ya tienes.')
         st.stop()
     try:
         book=read_book(source_bytes)
@@ -5070,12 +5225,8 @@ def _logidata_dashboard():
         coords=pd.DataFrame(columns=['nodo_id','lat','lon'])
 
     available=[p for p in ('FI','FII') if phase_data[p]['detailed']]
-    selected_phase=st.sidebar.selectbox('Fase principal para rutas',('Fase II','Fase I'),
-                                         index=0)
-    active='FI' if selected_phase=='Fase I' else 'FII'
-    if active not in available and available:
-        st.sidebar.info(f'No hay rutas detalladas de {active} en este Excel; se muestran las de {available[0]}.')
-        active=available[0]
+    # Sin menú lateral: presentar las rutas finales de Fase II, y Fase I si no existen.
+    active = 'FII' if 'FII' in available else (available[0] if available else 'FII')
 
     refi=summaries['FI']['costo_total']; refii=summaries['FII']['costo_total']
     saving=refi-refii if np.isfinite(refi) and np.isfinite(refii) else np.nan
@@ -5083,7 +5234,7 @@ def _logidata_dashboard():
     availability_label=('FI y FII con rutas' if len(available)==2
                         else ('Información detallada disponible: '+', '.join(available)
                               if available else 'Solo resúmenes'))
-    st.caption(f'Ejecución seleccionada: {source_name} · {availability_label}')
+    st.caption(f'Ejecución analizada: {source_name} · {availability_label}')
 
     names=['Resumen ejecutivo','Comparación de fases','Análisis económico','Mapa general',
            'Rutas individuales','Bodegas y asignación','Vehículos y rutas','Rendimiento',
@@ -5814,7 +5965,7 @@ def _logidata_dashboard():
 
 
     def crear_informe_pdf():
-        """Resumen generado desde la ejecución cargada; sin optimizar ni crear datos."""
+        # """Resumen generado desde la ejecución cargada; sin optimizar ni crear datos."""
         try:
             from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
             from reportlab.lib import colors
@@ -5858,6 +6009,8 @@ def _logidata_dashboard():
         pdf.build(content);return buffer.getvalue()
 
 
+    summary_text=f'''# Informe ejecutivo LogiData\n\nFuente: {source_name}\n\n- Costo diario Fase I: {fmt_money(refi)} COP/día\n- Costo diario Fase II: {fmt_money(refii)} COP/día\n- Ahorro: {fmt_money(saving)} COP/día ({fmt_num(percent,2)} %)\n- Rutas / vehículos finales: {fmt_num(summaries['FII']['rutas'],0)}\n- Bodegas abiertas finales: {fmt_num(summaries['FII']['bodegas'],0)}\n- Distancia final: {fmt_num(summaries['FII']['km'],2)} km\n- Tiempo total de ejecución: {fmt_num(total if 'total' in locals() else np.nan,2)} s\n\nLas conexiones de los mapas son esquemáticas, no geometrías viales. Se muestran únicamente datos disponibles en los registros.\n'''
+
     with tabs[12]:
         st.subheader('Exportación de resultados')
         st.caption('Todas las descargas corresponden a la ejecución seleccionada.')
@@ -5896,20 +6049,17 @@ def _logidata_dashboard():
                     'LogiData_Informe_Ejecutivo.pdf',mime='application/pdf')
         st.download_button('Descargar Excel consolidado completo',source_bytes,source_name,
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',key='excel_full_export')
+        st.download_button('Descargar resumen ejecutivo (.md)',summary_text.encode('utf-8'),
+            'LogiData_Resumen_Ejecutivo.md',mime='text/markdown',key='resumen_md_export')
 
-    summary_text=f'''# Informe ejecutivo LogiData\n\nFuente: {source_name}\n\n- Costo diario Fase I: {fmt_money(refi)} COP/día\n- Costo diario Fase II: {fmt_money(refii)} COP/día\n- Ahorro: {fmt_money(saving)} COP/día ({fmt_num(percent,2)} %)\n- Rutas / vehículos finales: {fmt_num(summaries['FII']['rutas'],0)}\n- Bodegas abiertas finales: {fmt_num(summaries['FII']['bodegas'],0)}\n- Distancia final: {fmt_num(summaries['FII']['km'],2)} km\n- Tiempo total de ejecución: {fmt_num(total if 'total' in locals() else np.nan,2)} s\n\nLas conexiones de los mapas son esquemáticas, no geometrías viales. Se muestran únicamente datos disponibles en los registros.\n'''
-    st.sidebar.divider()
-    st.sidebar.download_button('Descargar resumen ejecutivo',summary_text.encode('utf-8'),
-                               'LogiData_Resumen_Ejecutivo.md',mime='text/markdown')
-    st.sidebar.download_button('Descargar Excel original',source_bytes,source_name,
-                               mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    # Las descargas se conservan en la pestaña «Descargas e informe».
 
 
     with tabs[13]:
         st.subheader('Comparación real entre instancias')
         st.caption('Cada fila procede de su propio Excel consolidado. La comparación es descriptiva: las instancias tienen distintas demandas y tamaños.')
         if not archivos_instancias:
-            st.info('No hay ejecuciones guardadas en la carpeta de resultados. Utiliza --all-instances para producirlas o indica --results-dir.')
+            st.info('No hay ejecuciones guardadas en la carpeta de resultados. Este dashboard funciona con un solo Excel; la comparación entre distintas ejecuciones requiere otros resultados guardados.')
         else:
             filas=[]
             for arch in archivos_instancias:
@@ -6046,7 +6196,7 @@ def _logidata_port_occupied(port):
         return False
 
 
-def _logidata_start_dashboard(excel, port, results_dir=None):
+def _logidata_start_dashboard(excel, port):
     from pathlib import Path
     import subprocess, sys, time, webbrowser
     excel=Path(excel).expanduser().resolve()
@@ -6063,12 +6213,9 @@ def _logidata_start_dashboard(excel, port, results_dir=None):
                    if not _logidata_port_occupied(p)),None)
         if port is None: raise RuntimeError('No se encontró puerto libre para Streamlit')
     # Una instancia nueva lee el Excel exacto de ESTA ejecución; ningún dato queda precargado.
-    dashboard_args=['--dashboard','--excel',str(excel)]
-    if results_dir is not None:
-        dashboard_args+=['--results-dir',str(Path(results_dir).resolve())]
     proc=subprocess.Popen([sys.executable,'-m','streamlit','run',
             str(Path(__file__).resolve()),'--server.port',str(port),
-            '--server.headless','true','--',*dashboard_args],
+            '--server.headless','true','--','--dashboard','--excel',str(excel)],
             cwd=str(_logidata_root()))
     url='http://localhost:'+str(port)
     try:
@@ -6094,55 +6241,6 @@ def _logidata_start_dashboard(excel, port, results_dir=None):
         raise
 
 
-
-def _logidata_catalogo_instancias(root=None):
-    """Encuentra únicamente instancias de entrada, nunca Excel consolidados."""
-    import re
-    from pathlib import Path
-    base=Path(root).expanduser().resolve() if root else _logidata_root()
-    encontrados={}
-    for archivo in sorted(base.glob('LogiData_Instancia_*_clientes*.xlsx')):
-        m=re.search(r'Instancia_(\d+)_(\d+)_clientes',archivo.name,re.I)
-        if not m: continue
-        clientes=int(m.group(2))
-        if clientes not in (5,10,15,20,25): continue
-        if clientes in encontrados:
-            raise ValueError(f'Se encontraron dos Excel de {clientes} clientes en {base}. Deja solo uno por tamaño o usa --instance con la ruta exacta.')
-        encontrados[clientes]=archivo
-    return dict(sorted(encontrados.items()))
-
-
-def _logidata_resolver_instancia(value):
-    """Acepta número de clientes (5/10/15/20/25) o ruta .xlsx."""
-    from pathlib import Path
-    if str(value).isdigit():
-        opciones=_logidata_catalogo_instancias()
-        numero=int(value)
-        if numero not in opciones:
-            raise FileNotFoundError(f'No existe un archivo de instancia para {numero} clientes junto al programa.')
-        return opciones[numero],numero
-    path=Path(value).expanduser().resolve()
-    if not path.is_file() or path.suffix.lower()!='.xlsx':
-        raise FileNotFoundError(f'Instancia Excel no encontrada: {value}')
-    # Leer SOLO metadatos para asegurar que el nombre no determina el tamaño.
-    import pandas as pd
-    cantidad=len(pd.read_excel(path,sheet_name='Sheet1',usecols=[0],engine='openpyxl'))
-    return path,cantidad
-
-
-def _logidata_ejecutar_instancia(path,clients,target,extra):
-    from pathlib import Path
-    path=Path(path).resolve();target=Path(target).resolve()
-    target.parent.mkdir(parents=True,exist_ok=True)
-    entradas=[item for key in ('bodegas','clientes','distancias','tiempos')
-              for item in ('--'+key,str(path))]
-    print('\n'+'='*65+f'\nINSTANCIA: {clients} clientes | {path.name}\n'+'='*65,flush=True)
-    ejecutar_integrado([*entradas,*extra,'--output',str(target)])
-    if not target.is_file():
-        raise RuntimeError(f'No se generó el Excel para {clients} clientes')
-    print('Consolidado de instancia:',target,flush=True)
-    return target
-
 def _logidata_entrada(argv=None):
     import argparse
     import sys
@@ -6167,11 +6265,6 @@ def _logidata_entrada(argv=None):
     ap.add_argument('--output',default=str(_logidata_root()/'LogiData_Fases_I_II_consolidado.xlsx'))
     ap.add_argument('--port',type=int,default=8501)
     ap.add_argument('--no-dashboard',action='store_true',help='Solo optimizar y guardar Excel')
-    ap.add_argument('--instance',help='Instancia individual: 5, 10, 15, 20, 25 o ruta del Excel único')
-    ap.add_argument('--all-instances',action='store_true',help='Resolver las cinco instancias consecutivamente en una sola ejecución y abrir el dashboard')
-    ap.add_argument('--instances-dir',help='Carpeta con las cinco instancias (por defecto, junto al .py)')
-    ap.add_argument('--results-dir',default=str(_logidata_root()/'resultados_logidata'),
-                    help='Carpeta para los consolidados independientes')
     ap.add_argument('--help-optimizer',action='store_true',help='Ver opciones originales de Fases I y II')
     opts, extra=ap.parse_known_args(args)
     if opts.help_optimizer:
@@ -6179,9 +6272,7 @@ def _logidata_entrada(argv=None):
     if not 1 <= opts.port <= 65535:
         ap.error('Puerto inválido')
     if opts.view:
-        return _logidata_start_dashboard(opts.view,opts.port,opts.results_dir)
-    if opts.instance and opts.all_instances:
-        ap.error('Selecciona --instance o --all-instances, no ambos.')
+        return _logidata_start_dashboard(opts.view,opts.port)
     target=Path(opts.output).expanduser().resolve()
     if target.suffix.lower()!='.xlsx':
         ap.error('--output debe terminar en .xlsx')
@@ -6193,43 +6284,6 @@ def _logidata_entrada(argv=None):
         if missing:
             raise RuntimeError('Instala las dependencias del dashboard: '
                  'py -m pip install streamlit plotly (faltan: '+', '.join(missing)+')')
-    # Modo multiinstancia, sin cambiar parámetros, semillas ni rutinas heurísticas.
-    if opts.instance or opts.all_instances:
-        if opts.all_instances:
-            catalogo=_logidata_catalogo_instancias(opts.instances_dir)
-            if not catalogo:
-                raise FileNotFoundError('No hay instancias junto al programa. Usa --instances-dir CARPETA.')
-            missing = sorted({5,10,15,20,25}-set(catalogo))
-            if missing:
-                raise FileNotFoundError('Faltan instancias de '+', '.join(str(n) for n in missing)+
-                    ' clientes. Coloca los cinco archivos de entrada en la misma carpeta antes de ejecutar --all-instances.')
-            targets=list(catalogo.items())
-        elif opts.instance.isdigit() and opts.instances_dir:
-            catalogo=_logidata_catalogo_instancias(opts.instances_dir)
-            n=int(opts.instance)
-            if n not in catalogo: raise FileNotFoundError(f'No hay instancia de {n} clientes en {opts.instances_dir}')
-            targets=[(n,catalogo[n])]
-        else:
-            path,n=_logidata_resolver_instancia(opts.instance)
-            targets=[(n,path)]
-        dest=Path(opts.results_dir).expanduser().resolve()
-        dest.mkdir(parents=True,exist_ok=True)
-        productos=[];errores=[]
-        for n,instancia in targets:
-            result_path=dest/f'LogiData_Resultados_{n:02d}_clientes.xlsx'
-            try:
-                productos.append(_logidata_ejecutar_instancia(instancia,n,result_path,extra))
-            except Exception as ex:
-                print(f'ERROR de instancia {n}: {ex}',file=sys.stderr,flush=True)
-                errores.append((n,str(ex)))
-                if not opts.all_instances: raise
-        if not productos:
-            raise RuntimeError('Ninguna instancia generó resultados correctos: '+str(errores))
-        print(f'Ejecuciones terminadas: {len(productos)} de {len(targets)}',flush=True)
-        if errores: print('Instancias con error:',errores,file=sys.stderr)
-        if opts.no_dashboard: return 1 if errores else 0
-        status=_logidata_start_dashboard(productos[0],opts.port,dest)
-        return 1 if errores else status
     inputs=_logidata_pick_inputs() if opts.select_files else _logidata_auto_inputs()
     target.parent.mkdir(parents=True,exist_ok=True)
     print('Iniciando Fases I y II originales, sin gráficos durante la optimización.',flush=True)
@@ -6241,14 +6295,14 @@ def _logidata_entrada(argv=None):
     print('Excel consolidado creado correctamente:',target,flush=True)
     if opts.no_dashboard:
         return 0
-    return _logidata_start_dashboard(target,opts.port,opts.results_dir)
+    return _logidata_start_dashboard(target,opts.port)
 
 
 if __name__=='__main__':
     try:
         import sys
         sys.exit(_logidata_entrada())
-    except (RuntimeError,FileNotFoundError,ValueError) as exc:
+    except (RuntimeError,FileNotFoundError) as exc:
         import sys
         print('ERROR:',exc,file=sys.stderr)
         sys.exit(1)
